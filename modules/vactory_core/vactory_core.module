@@ -118,12 +118,19 @@ function vactory_core_mail_alter(&$message) {
   // Redirect all site mails (except reset password mail),
   // When vactory_mail_redirect is defined.
   $route_name = Drupal::routeMatch()->getRouteName();
-  $mail_redirect = Settings::get('vactory_mail_redirect', FALSE);
+  $mail_redirect = Settings::get('vactory_mail_redirect', []);
   if ($mail_redirect && !empty($mail_redirect) && $route_name !== 'user.pass') {
-    $mail_dist = str_replace(',', ' ', $message['to']);
+    if (!is_array($mail_redirect)) {
+      $mail_redirect = array_map('trim', explode(',', $mail_redirect));
+    }
+    $mail_dist = is_array($message['to']) ? implode(', ', $message['to']) : $message['to'];
     $prefix = t('Destination addresse(s)');
-    $to = $prefix . ': ' . $mail_dist;
-    $message['to'] = $to . '<' . $mail_redirect . '>';
+    $formatted_addresses = [];
+    foreach ($mail_redirect as $address) {
+      $formatted_addresses[] = '<' . $address . '>';
+    }
+    $message['to'] = $prefix . ': ' . implode(', ', $formatted_addresses);
+    $message['subject'] .= " (To: {$mail_dist})";
   }
 }
 
@@ -134,19 +141,19 @@ function vactory_core_mailer_build(EmailInterface $email) {
   // Redirect all site mails (except reset password mail),
   // When vactory_mail_redirect is defined.
   $route_name = Drupal::routeMatch()->getRouteName();
-  $mail_redirect = Settings::get('vactory_mail_redirect', FALSE);
+  $mail_redirect = Settings::get('vactory_mail_redirect', []);
   if ($mail_redirect && !empty($mail_redirect) && $route_name !== 'user.pass') {
-    $subject = $email->getSubject();
-    $to = $email->getTo();
-    $subject = $subject instanceof MarkupInterface ? $subject->__toString() : $subject;
+    if (!is_array($mail_redirect)) {
+      $mail_redirect = array_map('trim', explode(',', $mail_redirect));
+    }
     $to = array_map(function ($address) {
       return $address->getEmail();
-    }, $to);
-    $to = implode(' ', $to);
-    $subject .= " (To: {$to})";
-    $address = new Address($mail_redirect, 'Mail Redirect');
-    $email->setTo($address);
+    }, $email->getTo());
+    $to = implode(', ', $to);
+    $subject = $email->getSubject() . " (To: {$to})";
     $email->setSubject($subject);
+    $addresses = array_map(fn($email) => new Address($email), $mail_redirect);
+    $email->setTo($addresses);
   }
 }
 
