@@ -18,16 +18,22 @@ use Symfony\Component\HttpKernel\KernelEvents;
 class ResourceRequestSubscriber implements EventSubscriberInterface {
 
   /**
-   * @var EntityTypeManagerInterface
+   * The entity type manager service.
+   *
+   * @var \Drupal\Core\Entity\EntityTypeManagerInterface
    */
   protected $entityTypeManager;
 
   /**
-   * @var RouteMatchInterface
+   * The route match service..
+   *
+   * @var \Drupal\Core\Routing\RouteMatchInterface
    */
   protected $routeMatch;
 
   /**
+   * The token service.
+   *
    * @var \Drupal\Core\Utility\Token
    */
   protected $token;
