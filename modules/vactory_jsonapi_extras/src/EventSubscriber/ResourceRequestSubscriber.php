@@ -232,11 +232,11 @@ class ResourceRequestSubscriber implements EventSubscriberInterface {
       $name = trim($name);
       if (!empty($name) && !empty($value)) {
         if ($name === 'filter') {
-          $recieved_filters = $request->query->get('filter', []);
+          $recieved_filters = $request->query->all()['filter'] ?? [];
           $value = array_merge($recieved_filters, $value);
         }
         if ($name === 'page') {
-          $recieved_filters = $request->query->get('page', []);
+          $recieved_filters = $request->query->all()['page'] ?? [];
           $value = array_merge($recieved_filters, $value);
         }
         $request->query->set($name, $value);
