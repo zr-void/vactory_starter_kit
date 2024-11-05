@@ -4,6 +4,7 @@ namespace Drupal\vactory_decoupled\Controller;
 
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\node\Entity\Node;
+use Drupal\user\Entity\User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -26,6 +27,9 @@ class DuplicateParagraphController extends ControllerBase {
     $nid = $body['nid'] ?? NULL;
     $weight = $body['weight'] ?? 0;
     $parent_id = $body['parent_id'] ?? NULL;
+    $is_first = $body['is_first'] ?? FALSE;
+    $type = $body['type'] ?? "paragraph--vactory_component";
+    $bundle = $body['bundle'] ?? "node--vactory_page";
     $paragraph_query = $this->entityTypeManager()
       ->getStorage('paragraph')
       ->getQuery();
@@ -33,7 +37,7 @@ class DuplicateParagraphController extends ControllerBase {
     $paragraph_query->condition('id', $paragraph_id)
       ->condition('parent_id', $parent_id)
       ->condition('parent_type', 'node')
-      ->condition('type', "vactory_component");
+      ->condition('type', str_replace('paragraph--', '', $type));
 
     $res = $paragraph_query->execute();
     if (count($res) !== 1) {
@@ -66,10 +70,21 @@ class DuplicateParagraphController extends ControllerBase {
     // Load and validate node.
     $node = $this->loadNode($nid);
     $paragraphs = $node->field_vactory_paragraphs->getValue() ?? [];
-    $this->insertByWeight($paragraphs, [
-      'target_id' => $duplicate_entity->id(),
-      'target_revision_id' => $duplicate_entity->getRevisionId(),
-    ], $weight);
+    if ($is_first) {
+      $paragraphs = [
+        [
+          'target_id' => $duplicate_entity->id(),
+          'target_revision_id' => $duplicate_entity->getRevisionId(),
+        ],
+        ...$paragraphs,
+      ];
+    }
+    else {
+      $this->insertByWeight($paragraphs, [
+        'target_id' => $duplicate_entity->id(),
+        'target_revision_id' => $duplicate_entity->getRevisionId(),
+      ], $weight);
+    }
 
     $node->set('field_vactory_paragraphs', $paragraphs);
     $node->save();
@@ -78,7 +93,7 @@ class DuplicateParagraphController extends ControllerBase {
     return new JsonResponse([
       'status' => TRUE,
       'message' => $this->t('Paragraph duplicated !'),
-      'paragraph' => $this->prepareComponentData($duplicate_entity),
+      'paragraphs' => $this->prepareComponentData($nid, $bundle)['data'] ?? [],
     ], 200);
   }
 
@@ -92,6 +107,7 @@ class DuplicateParagraphController extends ControllerBase {
       $body = $this->parseRequestBody($request);
       $paragraph_id = $body['paragraph_id'] ?? NULL;
       $nid = $body['nid'] ?? NULL;
+      $bundle = $body['bundle'] ?? "node--vactory_page";
 
       $node = $this->loadNode($nid);
 
@@ -106,6 +122,7 @@ class DuplicateParagraphController extends ControllerBase {
       return new JsonResponse([
         'status' => TRUE,
         'message' => $this->t('Paragraph successfully deleted.'),
+        'paragraphs' => $this->prepareComponentData($nid, $bundle)['data'] ?? [],
       ], 200);
     }
     catch (\Exception $e) {
@@ -119,16 +136,20 @@ class DuplicateParagraphController extends ControllerBase {
   /**
    * Prepare component data.
    */
-  private function prepareComponentData($entity) {
-    $data = $entity->get("field_vactory_component")->getValue();
-    $processed_paragraph = \Drupal::service('vactory_decoupled.dynamic_field_manager')
-      ->process($data[0]);
-    return [
-      "id" => $entity->id(),
-      "data" => $processed_paragraph['data'] ?? NULL,
-      "title" => $entity->get('field_vactory_title')->getValue()[0]['value'] ?? "",
-      "flag" => $entity->get('field_vactory_flag')->getValue()[0]['value'] ?? "",
+  private function prepareComponentData($nid, $bundle) {
+    $config = [
+      'resource' => $bundle,
+      'filters' => [
+        'filter[drupal_internal__nid]=' . $nid,
+        'fields[node--vactory_page]=field_vactory_paragraphs',
+        'fields[paragraph--vactory_component]=drupal_internal__id,paragraph_section,paragraph_identifier,paragraph_container,field_animation,container_spacing,paragraph_css_class,paragraph_background_color,paragraph_background_image,field_vactory_component,field_vactory_title,field_background_color,field_paragraph_hide_lg,field_paragraph_hide_sm,field_position_image_x,field_position_image_y,field_size_image,field_vactory_flag,field_vactory_flag_2,paragraph_background_parallax',
+        'fields[media--image]=thumbnail',
+        'fields[file--image]=uri',
+        'include=field_vactory_paragraphs,field_vactory_paragraphs.field_vactory_paragraph_tab,field_vactory_paragraphs.paragraph_background_image,field_vactory_paragraphs.paragraph_background_image.thumbnail',
+      ],
     ];
+    $json_api_generator_service = \Drupal::service('vactory_decoupled.jsonapi.generator');
+    return $json_api_generator_service->fetch($config);
   }
 
   /**
@@ -156,7 +177,7 @@ class DuplicateParagraphController extends ControllerBase {
 
     ksort($newItems);
     $items = array_combine(
-      array_map(function ($k) use ($multiplier) {
+      array_map(function($k) use ($multiplier) {
         return $k / $multiplier;
       }, array_keys($newItems)),
       array_values($newItems)
@@ -168,6 +189,7 @@ class DuplicateParagraphController extends ControllerBase {
    */
   private function checkUserPermission() {
     $user = $this->currentUser();
+    $user = User::load($user->id());
     if (!$user->hasPermission('edit content live mode')) {
       throw new AccessDeniedHttpException('Edit content live mode permission is required.');
     }
@@ -200,7 +222,7 @@ class DuplicateParagraphController extends ControllerBase {
    * Remove paragraph.
    */
   private function removeParagraph(array $paragraphs, int $paragraph_id) {
-    $updated_paragraphs = array_filter($paragraphs, function ($paragraph) use ($paragraph_id) {
+    $updated_paragraphs = array_filter($paragraphs, function($paragraph) use ($paragraph_id) {
       return $paragraph['target_id'] != $paragraph_id;
     });
     if (count($updated_paragraphs) === count($paragraphs)) {
