@@ -177,7 +177,7 @@ class DuplicateParagraphController extends ControllerBase {
 
     ksort($newItems);
     $items = array_combine(
-      array_map(function($k) use ($multiplier) {
+      array_map(function ($k) use ($multiplier) {
         return $k / $multiplier;
       }, array_keys($newItems)),
       array_values($newItems)
@@ -222,7 +222,7 @@ class DuplicateParagraphController extends ControllerBase {
    * Remove paragraph.
    */
   private function removeParagraph(array $paragraphs, int $paragraph_id) {
-    $updated_paragraphs = array_filter($paragraphs, function($paragraph) use ($paragraph_id) {
+    $updated_paragraphs = array_filter($paragraphs, function ($paragraph) use ($paragraph_id) {
       return $paragraph['target_id'] != $paragraph_id;
     });
     if (count($updated_paragraphs) === count($paragraphs)) {
