@@ -229,3 +229,17 @@ vactory_decoupled.delete_paragraph:
   methods: [POST]
   requirements:
     _access: 'TRUE'
+vactory_decoupled.widgets_list:
+  path: /api/paragraph/list
+  defaults:
+    _controller: '\Drupal\vactory_decoupled\Controller\DuplicateParagraphController::list'
+  methods: [GET]
+  requirements:
+    _access: 'TRUE'
+vactory_decoupled.insert_widget:
+  path: /api/paragraph/new
+  defaults:
+    _controller: '\Drupal\vactory_decoupled\Controller\DuplicateParagraphController::new'
+  methods: [POST]
+  requirements:
+    _access: 'TRUE'
