@@ -5,6 +5,7 @@ namespace Drupal\vactory_decoupled\Controller;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\node\Entity\Node;
 use Drupal\user\Entity\User;
+use Drupal\vactory_dynamic_field_dummy\Services\GenerateDummyPageService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
@@ -134,9 +135,89 @@ class DuplicateParagraphController extends ControllerBase {
   }
 
   /**
+   * Get list of widgets.
+   */
+  public function list(Request $request) {
+    try {
+      $this->checkUserPermission();
+      $vactoryProviderManager = \Drupal::service('vactory_dynamic_field.vactory_provider_manager');
+      $widgets_list = $vactoryProviderManager->getModalWidgetsList([]);
+      $widgets_list = array_map(function ($widgets) {
+        $results = [];
+        foreach ($widgets as $widget) {
+          $item = [];
+          $item['id'] = $widget['uuid'];
+          $item['title'] = $widget['name'];
+          $item['imageUrl'] = $widget['screenshot'];
+          array_push($results, $item);
+        }
+        return $results;
+      }, $widgets_list);
+      return new JsonResponse([
+        'widgets' => $widgets_list ?? [],
+      ], 200);
+    }
+    catch (\Exception $e) {
+      \Drupal::logger('vactory_decoupled')->error($e->getMessage());
+      throw new BadRequestHttpException($e->getMessage());
+    }
+  }
+
+  /**
+   * Create new paragraph.
+   */
+  public function new(Request $request) {
+    try {
+      $this->checkUserPermission();
+      $body = $this->parseRequestBody($request);
+      $nid = $body['nid'] ?? NULL;
+      $widget_id = $body['widget_id'] ?? NULL;
+      $weight = $body['weight'] ?? 0;
+      $is_first = $body['is_first'] ?? FALSE;
+      $bundle = $body['bundle'] ?? 'node--vactory_page';
+      $vactoryProviderManager = \Drupal::service('vactory_dynamic_field.vactory_provider_manager');
+      $widget = $vactoryProviderManager->loadSettings($widget_id);
+      $widget_data = GenerateDummyPageService::prepareContent($widget);
+      $paragraph = GenerateDummyPageService::createParagraph($widget_id, $widget_data);
+
+      $inserted_paragraph = [
+        'target_id' => $paragraph->id(),
+        'target_revision_id' => \Drupal::entityTypeManager()
+          ->getStorage('paragraph')
+          ->getLatestRevisionId($paragraph->id()),
+      ];
+      // Load and validate node.
+      $node = $this->loadNode($nid);
+      $paragraphs = $node->field_vactory_paragraphs->getValue() ?? [];
+      if ($is_first) {
+        $paragraphs = [
+          $inserted_paragraph,
+          ...$paragraphs,
+        ];
+      }
+      else {
+        $this->insertByWeight($paragraphs, $inserted_paragraph, $weight);
+      }
+
+      $node->set('field_vactory_paragraphs', $paragraphs);
+      $node->save();
+      clear_next_cache();
+      return new JsonResponse([
+        'status' => TRUE,
+        'message' => $this->t('Paragraph duplicated !'),
+        'paragraphs' => $this->prepareComponentData($nid, $bundle)['data'] ?? [],
+      ], 200);
+    }
+    catch (\Exception $e) {
+      \Drupal::logger('vactory_decoupled')->error($e->getMessage());
+      throw new BadRequestHttpException($e->getMessage());
+    }
+  }
+
+  /**
    * Prepare component data.
    */
-  private function prepareComponentData($nid, $bundle) {
+  private function prepareComponentData($nid, $bundle = 'node--vactory_page') {
     $config = [
       'resource' => $bundle,
       'filters' => [
