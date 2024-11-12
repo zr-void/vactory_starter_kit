@@ -180,6 +180,12 @@ class DuplicateParagraphController extends ControllerBase {
       $widget_data = GenerateDummyPageService::prepareContent($widget);
       $paragraph = GenerateDummyPageService::createParagraph($widget_id, $widget_data);
 
+      foreach ($this->languageManager()->getLanguages() as $language) {
+        if (!$paragraph->hasTranslation($language->getId())) {
+          $paragraph->addTranslation($language->getId(), $paragraph->toArray());
+          $paragraph->save();
+        }
+      }
       $inserted_paragraph = [
         'target_id' => $paragraph->id(),
         'target_revision_id' => \Drupal::entityTypeManager()
