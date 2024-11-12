@@ -215,6 +215,46 @@ class DuplicateParagraphController extends ControllerBase {
   }
 
   /**
+   * Reorder the paragraphs.
+   */
+  public function reorder(Request $request) {
+    try {
+      $this->checkUserPermission();
+      $body = $this->parseRequestBody($request);
+      $nid = $body['nid'] ?? NULL;
+      $bundle = $body['bundle'] ?? 'node--vactory_page';
+      $paragraphs_ids = $body['paragraphs_ids'] ?? [];
+
+      // Load and validate node.
+      $node = $this->loadNode($nid);
+      $paragraphs = $node->field_vactory_paragraphs->getValue() ?? [];
+
+      $reordered_paragraphs = [];
+      foreach ($paragraphs_ids as $pid) {
+        $result = array_filter($paragraphs, function ($paragraph) use ($pid) {
+          return $paragraph['target_id'] == $pid;
+        });
+        if ($result) {
+          $reordered_paragraphs[] = reset($result);
+        }
+      }
+
+      $node->set('field_vactory_paragraphs', $reordered_paragraphs);
+      $node->save();
+      clear_next_cache();
+      return new JsonResponse([
+        'status' => TRUE,
+        'message' => $this->t('Paragraph reordered successfully.'),
+        'paragraphs' => $this->prepareComponentData($nid, $bundle)['data'] ?? [],
+      ], 200);
+    }
+    catch (\Exception $e) {
+      \Drupal::logger('vactory_decoupled')->error($e->getMessage());
+      throw new BadRequestHttpException($e->getMessage());
+    }
+  }
+
+  /**
    * Prepare component data.
    */
   private function prepareComponentData($nid, $bundle = 'node--vactory_page') {

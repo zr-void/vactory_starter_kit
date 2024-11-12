@@ -243,3 +243,10 @@ vactory_decoupled.insert_widget:
   methods: [POST]
   requirements:
     _access: 'TRUE'
+vactory_decoupled.reorder_paragraph:
+  path: /api/paragraph/reorder
+  defaults:
+    _controller: '\Drupal\vactory_decoupled\Controller\DuplicateParagraphController::reorder'
+  methods: [POST]
+  requirements:
+    _access: 'TRUE'
