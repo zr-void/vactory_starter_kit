@@ -77,22 +77,20 @@ function vactory_notification_generate($entity) {
   $notification_config = \Drupal::config('vactory_notifications.settings');
   $token = \Drupal::token();
   $default_langcode = \Drupal::languageManager()->getDefaultLanguage()->getId();
-  // Create queue if it doesn't exist
+  // Create queue if it doesn't exist.
   $queue = \Drupal::queue('vactory_notification_mail_queue');
   $queue->createQueue();
-  
+
   $source_translated_node = \Drupal::service('entity.repository')
     ->getTranslationFromContext($entity, $default_langcode);
-  $node_notification_title = !empty($source_translated_node->get('notification_title')->value) ? 
-    $source_translated_node->get('notification_title')->value : 
+
+  $node_notification_title = !empty($source_translated_node->get('notification_title')->value) ?
+    $source_translated_node->get('notification_title')->value :
     $notification_config->get('notifications_default_title');
-    
-  $node_notification_message = !empty($source_translated_node->get('notification_message')->value) ? 
-    $source_translated_node->get('notification_message')->value : 
+
+  $node_notification_message = !empty($source_translated_node->get('notification_message')->value) ?
+    $source_translated_node->get('notification_message')->value :
     $notification_config->get('notifications_default_message');
-  $notification_users_ids = $notification_manager->getNotificationsUsersIds($entity->bundle());
-  // Generate a notification.
-  $user_id = $entity->getOwnerId();
   $notification_data = [
     'type' => 'notification_entity',
     'name' => $token->replace($node_notification_title, ['entity' => $entity]),
@@ -161,12 +159,12 @@ function vactory_notification_generate($entity) {
         $broadcast_list_emails = $entity->get('broadcast_list_emails')
           ->getValue();
         $broadcast_list_emails = array_column($broadcast_list_emails, 'value');
-        // Queue emails for broadcast list
+        // Queue emails for broadcast list.
         foreach ($broadcast_list_emails as $email) {
           $queue->createItem([
             'subject' => $subject,
             'email' => $email,
-            'message' => new FormattableMarkup($message, [])
+            'message' => new FormattableMarkup($message, []),
           ]);
         }
       }
@@ -185,7 +183,7 @@ function vactory_notification_generate($entity) {
             if (count(array_intersect($user->getRoles(), $target_roles)) > 0 && !empty($user->getEmail())) {
               $queue->createItem([
                 'subject' => $subject,
-                'email' => $user->getEmail(), 
+                'email' => $user->getEmail(),
                 'message' => new FormattableMarkup($message, []),
               ]);
             }
@@ -204,7 +202,7 @@ function vactory_notification_generate($entity) {
 function vactory_notifications_notifications_entity_insert(EntityInterface $entity) {
   $notification_manager = \Drupal::service('vactory_notifications.manager');
   $token = \Drupal::token();
-  $notification_config = \Drupal::config('vactory_notifications.settings');
+  $notification_config = Drupal::config('vactory_notifications.settings');
   $current_route_name = \Drupal::routeMatch()->getRouteName();
   // Manually created notifications case.
   if ($current_route_name === 'entity.notifications_entity.add_page') {
@@ -573,58 +571,57 @@ function process_notification_mail_queue() {
   $queue = \Drupal::queue('vactory_notification_mail_queue');
   $queue_worker = \Drupal::service('plugin.manager.queue_worker')
     ->createInstance('vactory_notification_mail_queue');
-  
   $count = $queue->numberOfItems();
   $processed = 0;
   $failed = 0;
 
   while ($item = $queue->claimItem()) {
     try {
-      // Log attempt to send email
+      // Log attempt to send email.
       \Drupal::logger('vactory_notifications')->info('Attempting to send email to @email', [
-        '@email' => $item->data['email']
+        '@email' => $item->data['email'],
       ]);
 
       $queue_worker->processItem($item->data);
       $queue->deleteItem($item);
       $processed++;
-      
-      // Log successful email
+
+      // Log successful email.
       \Drupal::logger('vactory_notifications')->info('Successfully sent email to @email', [
-        '@email' => $item->data['email']
+        '@email' => $item->data['email'],
       ]);
 
-      // Log progress every 100 emails
+      // Log progress every 100 emails.
       if ($processed % 100 === 0) {
         \Drupal::logger('vactory_notifications')->notice('Processed @count of @total emails', [
           '@count' => $processed,
-          '@total' => $count
+          '@total' => $count,
         ]);
       }
     }
     catch (\Exception $e) {
       $failed++;
-      // Enhanced error logging
+      // Enhanced error logging.
       \Drupal::logger('vactory_notifications')->error(
         'Failed to send email to @email. Error: @error. Stack trace: @trace. Subject: @subject', [
           '@email' => $item->data['email'],
           '@error' => $e->getMessage(),
           '@trace' => $e->getTraceAsString(),
-          '@subject' => $item->data['subject']
+          '@subject' => $item->data['subject'],
         ]
       );
-      
-      // Release item back to queue for retry
+
+      // Release item back to queue for retry.
       $queue->releaseItem($item);
     }
   }
 
-  // Final summary log
+  // Final summary log.
   \Drupal::logger('vactory_notifications')->notice(
     'Email sending completed. Total: @total, Successful: @success, Failed: @failed', [
       '@total' => $count,
       '@success' => $processed,
-      '@failed' => $failed
+      '@failed' => $failed,
     ]
   );
 }
