@@ -155,11 +155,11 @@ function vactory_notification_generate($entity) {
       $subject = $token->replace($node_mail_subject, ['entity' => $entity]);
       $message = $token->replace($node_mail_message, ['entity' => $entity]);
 
-      $use_broadcast_list = $entity->get('use_broadcast_list')->value;
+      $use_broadcast_list = $entity->hasField('use_broadcast_list') && $entity->get('use_broadcast_list')->value;
       if ($use_broadcast_list) {
         // Get emails from broadcast_list_emails field.
-        $broadcast_list_emails = $entity->get('broadcast_list_emails')
-          ->getValue();
+        $broadcast_list_emails = $entity->hasField('broadcast_list_emails') ? $entity->get('broadcast_list_emails')
+          ->getValue() : [];
         $broadcast_list_emails = array_column($broadcast_list_emails, 'value');
         // Queue emails for broadcast list.
         foreach ($broadcast_list_emails as $email) {
