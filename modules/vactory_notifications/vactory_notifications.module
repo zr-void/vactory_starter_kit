@@ -83,7 +83,6 @@ function vactory_notification_generate($entity) {
 
   $source_translated_node = \Drupal::service('entity.repository')
     ->getTranslationFromContext($entity, $default_langcode);
-
   $node_notification_title = !empty($source_translated_node->get('notification_title')->value) ?
     $source_translated_node->get('notification_title')->value :
     $notification_config->get('notifications_default_title');
@@ -91,6 +90,9 @@ function vactory_notification_generate($entity) {
   $node_notification_message = !empty($source_translated_node->get('notification_message')->value) ?
     $source_translated_node->get('notification_message')->value :
     $notification_config->get('notifications_default_message');
+  $notification_users_ids = $notification_manager->getNotificationsUsersIds($entity->bundle());
+  // Generate a notification.
+  $user_id = $entity->getOwnerId();
   $notification_data = [
     'type' => 'notification_entity',
     'name' => $token->replace($node_notification_title, ['entity' => $entity]),
