@@ -990,8 +990,28 @@ function redirectToFrontend($from_404 = FALSE) {
  * Implements hook_preprocess_HOOK().
  */
 function vactory_decoupled_preprocess_html(&$variables) {
+  $excluded_paths_raw = \Drupal::configFactory()
+    ->get('vactory_decoupled.settings')
+    ->get('iframe_excluded_paths', '');
+  $excluded_paths = is_string($excluded_paths_raw) ? explode("\n", $excluded_paths_raw) : [];
+  $excluded_paths = array_map(function ($route) {
+    return trim($route);
+  }, $excluded_paths);
+  $current_path = \Drupal::request()->getPathInfo();
+  $internal_path = \Drupal::service('path.current')->getPath();
+
+  // Remove language prefix from current paths.
+  $current_path_no_lang = preg_replace('#^/[a-z]{2,}(-[a-z]+)?(?=/$|$|/)#', '', $current_path);
+  $current_path_no_lang = $current_path_no_lang ?: '/';
+
+  $is_path_excluded = count(array_intersect($excluded_paths, [
+    $current_path_no_lang ?? "",
+    $internal_path ?? "",
+    $current_path ?? "",
+  ])) > 0;
+
   $route_name = Drupal::routeMatch()->getRouteName();
-  $exluded_routes = [
+  $excluded_routes = [
     'user.login',
     'user.register',
     'user.pass',
@@ -1002,7 +1022,7 @@ function vactory_decoupled_preprocess_html(&$variables) {
     'entity.webform.canonical',
     'entity.comment.edit_form',
   ];
-  if (!in_array($route_name, $exluded_routes)) {
+  if (!in_array($route_name, $excluded_routes) && !$is_path_excluded) {
     $langcode = Drupal::languageManager()->getCurrentLanguage()->getId();
     $current_path = \Drupal::service('path.current')->getPath();
     $alias = \Drupal::service('path_alias.manager')->getAliasByPath($current_path);
