@@ -44,28 +44,29 @@ function vactory_decoupled_cross_content_decoupled_df_format_alter(&$value, &$in
 
     if (isset($taxonomy_field) && !empty($taxonomy_field) && $taxonomy_field !== 'none') {
       $node = Node::load($node_id);
-      $node_term_ids = $node->get($taxonomy_field)->getValue();
-      $node_term_ids = array_map(function ($item) {
-        return $item['target_id'];
-      }, $node_term_ids);
+      if ($node->hasField($taxonomy_field)) {
+        $node_term_ids = $node->get($taxonomy_field)->getValue();
+        $node_term_ids = array_map(function ($item) {
+          return $item['target_id'];
+        }, $node_term_ids);
 
-      $query = _prepare_base_query($content_type, $node_id, $language, $nbr);
-      $query->condition($taxonomy_field, $node_term_ids, 'IN');
+        $query = _prepare_base_query($content_type, $node_id, $language, $nbr);
+        $query->condition($taxonomy_field, $node_term_ids, 'IN');
 
-      $result = $query->execute();
+        $result = $query->execute();
 
-      if (count($result) < $nbr) {
-        // Complete the block with random nodes.
-        $items_to_add = $nbr - count($result);
-        $query = _prepare_base_query($content_type, $node_id, $language, $items_to_add);
+        if (count($result) < $nbr) {
+          // Complete the block with random nodes.
+          $items_to_add = $nbr - count($result);
+          $query = _prepare_base_query($content_type, $node_id, $language, $items_to_add);
 
-        $query->condition($taxonomy_field, $node_term_ids, 'NOT IN');
+          $query->condition($taxonomy_field, $node_term_ids, 'NOT IN');
 
-        $result = [...$result, ...$query->execute()];
+          $result = [...$result, ...$query->execute()];
+        }
+
+        _prepare_nodes_filter($value, $result);
       }
-
-      _prepare_nodes_filter($value, $result);
-
     }
     elseif (!empty($term_ids)) {
       $filtring_terms = [];
