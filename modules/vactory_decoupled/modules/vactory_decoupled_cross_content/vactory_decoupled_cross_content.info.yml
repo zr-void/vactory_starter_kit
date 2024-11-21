@@ -6,3 +6,4 @@ version: 8.x-1.0
 package: Vactory
 dependencies:
   - vactory_jsonapi_cross_bundles
+  - vactory_cross_content
