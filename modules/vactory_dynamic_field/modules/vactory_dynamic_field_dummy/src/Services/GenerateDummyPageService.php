@@ -22,11 +22,11 @@ class GenerateDummyPageService {
     $limit = $multiple ? ($settings['limit'] ?? 3) : 1;
     $fields = $settings['fields'] ?? [];
     $extraFields = $settings['extra_fields'] ?? [];
+    $examples = $settings['examples'] ?? [];
     $fieldsContent = [
       'extra_field' => [],
       'pending_content' => [],
     ];
-
     // Prepare main content.
     for ($i = 0; $i < $limit; $i++) {
       $item = [];
@@ -34,11 +34,11 @@ class GenerateDummyPageService {
         if (strpos($key, 'group_') === 0) {
           unset($field['g_title']);
           foreach ($field as $field_key => $value) {
-            $item[$key][$field_key] = static::prepareContentForField($value);
+            $item[$key][$field_key] = static::prepareContentForField($value, $examples['fields'][$i][$key][$field_key]);
           }
         }
         else {
-          $item[$key] = static::prepareContentForField($field);
+          $item[$key] = static::prepareContentForField($field, $examples['fields'][$i][$key]);
         }
       }
       array_push($fieldsContent, $item);
@@ -52,7 +52,7 @@ class GenerateDummyPageService {
         }
       }
       else {
-        $fieldsContent['extra_field'][$key] = self::prepareContentForField($extraField);
+        $fieldsContent['extra_field'][$key] = $examples['extra_fields'][$key] ?? static::prepareContentForField($extraField);
       }
     }
 
@@ -62,29 +62,38 @@ class GenerateDummyPageService {
   /**
    * Prepare content for field.
    */
-  private static function prepareContentForField($field) {
+  private static function prepareContentForField($field, $example = "") {
     $item = NULL;
     $random = new Random();
     switch ($field['type'] ?? "") {
       case 'text':
-        $item = $random->sentences(4);
+        $item = $example ?? $random->sentences(4);
         break;
 
       case 'textarea':
-        $item = $random->sentences(14);
+        $item = $example ?? $random->sentences(14);
         break;
 
       case 'text_format':
         $item = [
-          "value" => "<p>{$random->paragraphs(5)}</p>",
+          "value" => $example ?? "<p>{$random->paragraphs(5)}</p>",
           "format" => "basic_html",
         ];
         break;
 
       case 'url_extended':
+        $link_title = $random->word(12);
+        $link_url = 'https://void.fr';
+        if ($example) {
+          $result = static::extractLabelAndUrl($example);
+          if ($result) {
+            $link_title = $result['label'];
+            $link_url = $result['url'];
+          }
+        }
         $item = [
-          'title' => $random->word(12),
-          'url' => 'https://void.fr',
+          'title' => $link_title,
+          'url' => $link_url,
           'attributes' => [
             'target' => '_self',
             'rel' => '',
@@ -95,23 +104,23 @@ class GenerateDummyPageService {
         break;
 
       case 'image':
-        $item = self::prepareImageField($random);
+        $item = self::prepareImageField($random, $example);
         break;
 
       case 'file':
-        $item = self::prepareFileField($random);
+        $item = self::prepareFileField($random, $example);
         break;
 
       case 'remote_video':
-        $item = self::prepareRemoteVideoField($random);
+        $item = self::prepareRemoteVideoField($random, $example);
         break;
 
       case 'checkbox':
-        $item = 1;
+        $item = $example ?? 1;
         break;
 
       case 'vactory_icon_picker':
-        $item = 'arrow-circle-left-solid';
+        $item = $example ?? 'arrow-circle-left-solid';
         break;
 
       case 'json_api_collection':
@@ -127,20 +136,39 @@ class GenerateDummyPageService {
           'buttons' => '',
         ];
         break;
-
     }
     return $item;
   }
 
   /**
+   * Extract label and url.
+   */
+  private static function extractLabelAndUrl($input) {
+    if (preg_match('/^(.*?)\s*\(([^\)]+)\)$/', $input, $matches)) {
+      return [
+        'label' => trim($matches[1]),
+        'url' => trim($matches[2]),
+      ];
+    }
+    return NULL;
+  }
+
+  /**
    * Prepare image field.
    */
-  private static function prepareImageField($random) {
+  private static function prepareImageField($random, $example) {
     try {
       $random_number = random_int(1, 20);
-      $image_data = file_get_contents("https://picsum.photos/id/" . $random_number . "/650/650.jpg");
+      $url = "https://picsum.photos/id/" . $random_number . "/650/650.jpg";
+      $filePath = "public://generated-media-for-dummy-content-{$random_number}.png";
+      if (!empty($example)) {
+        $fileName = basename(parse_url($example, PHP_URL_PATH));
+        $filePath = "public://generated-media-for-dummy-content-{$fileName}";
+        $url = $example;
+      }
+      $image_data = file_get_contents($url);
       $file_repository = \Drupal::service('file.repository');
-      $image = $file_repository->writeData($image_data, "public://generated-media-for-dummy-content-{$random_number}.png", FileSystemInterface::EXISTS_REPLACE);
+      $image = $file_repository->writeData($image_data, $filePath, FileSystemInterface::EXISTS_REPLACE);
       $image_file = File::load($image->id());
       $image_info = getimagesize($image_file->getFileUri());
       $image_file->save();
@@ -183,9 +211,9 @@ class GenerateDummyPageService {
   /**
    * Prepare file field.
    */
-  private static function prepareFileField($random) {
+  private static function prepareFileField($random, $example) {
     $extension_list = \Drupal::service('extension.list.module');
-    $filepath = $extension_list->getPath('vactory_dynamic_field_dummy') . '/assets/pdf-test.pdf';
+    $filepath = !empty($example) ? $example : $extension_list->getPath('vactory_dynamic_field_dummy') . '/assets/pdf-test.pdf';
     $file_media = NULL;
     if (!file_exists("public://" . basename($filepath))) {
       $directory = 'public://';
@@ -249,14 +277,14 @@ class GenerateDummyPageService {
   /**
    * Prepare remote video field.
    */
-  private static function prepareRemoteVideoField($random) {
+  private static function prepareRemoteVideoField($random, $example) {
     try {
       $video_media = Media::create([
         'bundle' => 'remote_video',
         'uid' => 1,
-        'name' => 'DrupalCon Prague 2022 Driesnote',
+        'name' => 'Remote video',
         'field_media_oembed_video' => [
-          'value' => 'https://www.youtube.com/watch?v=XrM-ZneIUPw',
+          'value' => !empty($example) ? $example : 'https://www.youtube.com/watch?v=XrM-ZneIUPw',
         ],
       ]);
       $video_media->save();
