@@ -4,6 +4,7 @@ namespace Drupal\vactory_checklist\Plugin\Checklist;
 
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Site\Settings;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -17,17 +18,6 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * )
  */
 class DevModulesCheck extends ChecklistBase implements ContainerFactoryPluginInterface {
-
-  /**
-   * Les modules à surveiller.
-   */
-  protected const DEV_MODULES = [
-    'devel',
-    'devel_generate',
-    'views_ui',
-    'features_ui',
-    'dblog',
-  ];
 
   /**
    * Le gestionnaire de modules.
@@ -68,7 +58,9 @@ class DevModulesCheck extends ChecklistBase implements ContainerFactoryPluginInt
 
     $enabled_dev_modules = [];
 
-    foreach (self::DEV_MODULES as $module) {
+    $dev_modules = Settings::get('config_exclude_modules', []);
+
+    foreach ($dev_modules as $module) {
       if ($this->moduleHandler->moduleExists($module)) {
         $enabled_dev_modules[] = $module;
       }

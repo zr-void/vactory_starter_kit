@@ -17,22 +17,15 @@ use Drupal\Core\Site\Settings;
 class EnvVarsCheck extends ChecklistBase {
 
   /**
-   * Liste des variables d'environnement requises.
-   */
-  protected const REQUIRED_VARIABLES = [
-    'BASE_FRONTEND_URL',
-    'FRONTEND_CACHE_KEY',
-    'BASE_MEDIA_URL',
-  ];
-
-  /**
    * {@inheritdoc}
    */
   public function runCheck() {
 
+    $required_env_vars = Settings::get('required_env_vars', []);
+
     $missing_vars = [];
 
-    foreach (self::REQUIRED_VARIABLES as $var) {
+    foreach ($required_env_vars as $var) {
       $value = getenv($var);
       $settings = Settings::get($var, FALSE);
 
