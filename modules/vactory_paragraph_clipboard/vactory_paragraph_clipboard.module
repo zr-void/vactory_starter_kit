@@ -32,6 +32,7 @@ function vactory_paragraph_clipboard_field_widget_single_element_form_alter(&$el
   // If paragraph entity exists, add its ID.
   if ($paragraph && method_exists($paragraph, 'id')) {
     $data_attributes['data-paragraph-id'] = $paragraph->id();
+    $data_attributes['data-paragraph-title'] = $paragraph->get('field_vactory_title')->value;
   }
 
   // Ajouter la bibliothèque.
@@ -69,6 +70,9 @@ function vactory_paragraph_clipboard_field_widget_complete_form_alter(&$field_wi
   if ($context['widget']->getPluginId() !== 'entity_reference_paragraphs') {
     return;
   }
+
+  // Ajouter la bibliothèque.
+  $field_widget_complete_form['#attached']['library'][] = 'vactory_paragraph_clipboard/clipboard';
 
   $node_id = $context['items']->getParent()->getEntity()->id();
   // Ajouter les boutons coller.
