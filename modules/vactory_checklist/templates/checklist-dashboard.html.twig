@@ -12,8 +12,8 @@
   {% for category, checks in results %}
     <div class="checklist-category">
       <h2>{{ category|title }}</h2>
-      
-      <table>
+
+      <table aria-describedby="Checklist table">
         <thead>
           <tr>
             <th>{{ 'Status'|t }}</th>
@@ -40,7 +40,7 @@
                 {% if check.result.details %}
                   <details class="checklist-details">
                     <summary>{{ 'Détails'|t }}</summary>
-                    <table class="details-table">
+                    <table class="details-table" aria-describedby="Checklist table">
                       <thead>
                         <tr>
                           {% for key, value in check.result.details[0] %}
