@@ -46,6 +46,7 @@
       $('.paragraph-clipboard-paste', context).on('click', function(e) {
         e.preventDefault();
         const nodeId = $(this).attr('data-node-id');
+        const paragraphToCopy = localStorage.getItem('paragraphToCopy');
 
         // Appel Ajax pour coller le paragraphe
         $.ajax({
